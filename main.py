@@ -57,7 +57,7 @@ def delayed_offer(user_id):
         "А что если сказать — у меня есть этот ключ?\n\n"
         "🔮 Здесь тайная комната. Карты говорят откровеннее, "
         "расклады глубже, а секреты честнее ✨\n\n"
-        "👇 Заходи."
+        "👇 Заходи"
     )
     markup1 = types.InlineKeyboardMarkup()
     markup1.add(types.InlineKeyboardButton("📖 Открыть тайную комнату", url="https://t.me/nasty_tarolog"))
@@ -66,10 +66,11 @@ def delayed_offer(user_id):
     time.sleep(4)
 
     # Второе сообщение
-    text2 = (
-        "Знаете, что происходит, когда карты говорят лично с вами?\n"
-        "👇Пишите, если душа просит большего 🌙"
-    )
+    text2 = "👇 Пишите, если душа просит большего 🌙"
+    markup2 = types.InlineKeyboardMarkup()
+    markup2.add(types.InlineKeyboardButton("💌 Личный разбор", url="https://t.me/NastyaKazantceva"))
+    bot.send_message(user_id, text2, reply_markup=markup2)
+
     markup2 = types.InlineKeyboardMarkup()
     markup2.add(types.InlineKeyboardButton("💌 Личный разбор", url="https://t.me/NastyaKazantceva"))
     bot.send_message(user_id, text2, reply_markup=markup2)
