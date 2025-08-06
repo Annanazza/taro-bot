@@ -15,6 +15,17 @@ photo_id = "AgACAgIAAxkBAAOCaH9iyqNRv_SfKkfo5Ptmxf82MdwAAm71MRuazPlLJrS1RkCpC_8B
 def get_today_day():
     return datetime.datetime.now().day
 
+# --- Клавиатура выбора ---
+def get_menu_markup():
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        types.InlineKeyboardButton("💖 Отношения", callback_data='love'),
+        types.InlineKeyboardButton("💰 Деньги", callback_data='money'),
+        types.InlineKeyboardButton("🔮 Завтра", callback_data='state')
+    )
+    return markup
+
+
 # --- Тестовые расклады на каждый день (замени на свои) ---
 love_readings = {
     1: "✨ Императрица\nЛюбовь расцветает, как весенний сад. Магнетизм притягивает нужных людей. Плодородие во всех смыслах.",
@@ -127,13 +138,7 @@ state_readings = {
 def send_daily_reminder():
     for user_id in list(subscribed_users.keys()):
         try:
-            markup = types.InlineKeyboardMarkup()
-            markup.add(
-                types.InlineKeyboardButton("💖 Отношения", callback_data='love'),
-                types.InlineKeyboardButton("💰 Деньги", callback_data='money'),
-                types.InlineKeyboardButton("🔮 Завтра", callback_data='state')
-            )
-            bot.send_message(user_id, "☀️ Доброе утро! Карты уже ждут тебя — выбери расклад на сегодня ✨", reply_markup=markup)
+            bot.send_message(user_id, "☀️ Доброе утро! Карты уже ждут тебя — выбери расклад на сегодня ✨", reply_markup=get_menu_markup())
             subscribed_users[user_id]['offer_sent'] = False
             subscribed_users[user_id]['last_date'] = datetime.date.today()
         except Exception as e:
@@ -173,6 +178,9 @@ def delayed_offer(user_id):
     markup2.add(types.InlineKeyboardButton("💌 Личный разбор", url="https://t.me/NastyaKazantceva"))
     bot.send_message(user_id, text2, reply_markup=markup2)
 
+    # Показываем меню снова
+    bot.send_message(user_id, "Выбери тему расклада:", reply_markup=get_menu_markup())
+
 # --- Flask ---
 @app.route('/')
 def home():
@@ -192,13 +200,7 @@ def welcome(message):
     if user_id not in subscribed_users:
         subscribed_users[user_id] = {'last_date': today, 'offer_sent': False}
 
-    markup = types.InlineKeyboardMarkup()
-    markup.add(
-        types.InlineKeyboardButton("💖 Отношения", callback_data='love'),
-        types.InlineKeyboardButton("💰 Деньги", callback_data='money'),
-        types.InlineKeyboardButton("🔮 Завтра", callback_data='state')
-    )
-    bot.send_message(user_id, "Выбери тему расклада на сегодня:", reply_markup=markup)
+    bot.send_message(user_id, "Выбери тему расклада на сегодня:", reply_markup=get_menu_markup())
 
 # --- Обработка кнопок ---
 @bot.callback_query_handler(func=lambda call: True)
@@ -225,6 +227,9 @@ def handle_query(call):
         return
 
     bot.send_message(user_id, text)
+
+    # Сразу показываем меню
+    bot.send_message(user_id, "Выбери тему расклада:", reply_markup=get_menu_markup())
 
     if not subscribed_users[user_id]['offer_sent']:
         Thread(target=lambda: delayed_offer(user_id)).start()
