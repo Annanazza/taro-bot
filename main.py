@@ -179,20 +179,26 @@ def welcome(message):
     sent = bot.send_message(user_id, "Что тебя сегодня волнует?", reply_markup=get_menu_markup())
     subscribed_users[user_id]['menu_message_id'] = sent.message_id
 
-# --- Обработка кнопок ---
 @bot.callback_query_handler(func=lambda call: True)
 def handle_query(call):
     user_id = call.message.chat.id
     today = get_today_day()
     today_date = datetime.date.today()
 
+    # Если пользователь новый — добавляем в словарь
     if user_id not in subscribed_users:
-        subscribed_users[user_id] = {'last_date': today_date, 'offer_sent': False, 'menu_message_id': call.message.message_id}
+        subscribed_users[user_id] = {
+            'last_date': today_date,
+            'offer_sent': False,
+            'menu_message_id': call.message.message_id
+        }
 
+    # Если наступил новый день — сбрасываем статус
     if subscribed_users[user_id]['last_date'] != today_date:
         subscribed_users[user_id]['offer_sent'] = False
         subscribed_users[user_id]['last_date'] = today_date
 
+    # Определяем, какой расклад отправить
     if call.data == 'love':
         text = love_readings.get(today, "Нет расклада на сегодня.")
     elif call.data == 'money':
@@ -203,23 +209,21 @@ def handle_query(call):
         bot.answer_callback_query(call.id, "Непонятный выбор.")
         return
 
-    # Отправляем расклад отдельным сообщением
+    # Отправляем расклад
     bot.send_message(user_id, text)
 
-    # Если авто-сообщение еще не было сегодня
+    # Если авто-сообщение ещё не отправлялось сегодня — отправляем
     if not subscribed_users[user_id]['offer_sent']:
         Thread(target=lambda: delayed_offer(user_id)).start()
         subscribed_users[user_id]['offer_sent'] = True
 
-    # Редактируем меню, чтобы "вернуться наверх"
+    # Обновляем клавиатуру меню (возврат наверх)
     bot.edit_message_reply_markup(
         chat_id=user_id,
         message_id=subscribed_users[user_id]['menu_message_id'],
         reply_markup=get_menu_markup()
     )
 
-def get_today_day():
-    return datetime.datetime.now().day
 
 # --- Запуск ---
 keep_alive()
