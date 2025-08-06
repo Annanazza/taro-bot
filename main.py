@@ -1,55 +1,82 @@
 import datetime
+import time
 import telebot
 from telebot import types
 from flask import Flask
 from threading import Thread
-import schedule
-import time
 
-# --- Твой токен ---
+# --- Токен бота ---
 TOKEN = '8095291011:AAEDchgL5NiZc_lRKVBKVwHscTWN4mXtXKw'
 bot = telebot.TeleBot(TOKEN)
 
 app = Flask('')
 
-# --- Текст автосообщения и ID фото ---
-auto_message = (
-    "🔮 Карты показали дверь... но ключ спрятали.\n"
-    "А что если сказать — у меня есть этот ключ?\n\n"
-    "Знаете, что происходит, когда карты говорят лично с вами?\n"
-    "Они называют имена. Показывают лица. Это не магия. Это ваша личная инструкция к жизни. ✨\n\n"
-    "@NastyaKazantceva — пишите, если душа просит большего 🌙"
-)
-photo_id = "AgACAgIAAxkBAAOCaH9iyqNRv_SfKkfo5Ptmxf82MdwAAm71MRuazPlLJrS1RkCpC_8BAAMCAAN3AAM2BA"
-
-# --- Отслеживание отправок пользователям ---
+# --- Хранилище пользователей и отметок ---
 subscribed_users = {}
-sent_today = set()
+photo_id = "AgACAgIAAxkBAAOCaH9iyqNRv_SfKkfo5Ptmxf82MdwAAm71MRuazPlLJrS1RkCpC_8BAAMCAAN3AAM2BA"
 
 def get_today_day():
     return datetime.datetime.now().day
 
-# --- Рассылать каждое утро в 08:00 МСК = 05:00 UTC ---
+# --- Функция утренней рассылки ---
 def send_daily_reminder():
-    today = datetime.date.today()
-    for user_id in subscribed_users:
+    for user_id in list(subscribed_users.keys()):
         try:
-            bot.send_message(user_id, "☀️ Доброе утро! Карты уже ждут тебя — выбери расклад на сегодня ✨")
+            markup = types.InlineKeyboardMarkup()
+            markup.add(
+                types.InlineKeyboardButton("💖 Отношения", callback_data='love'),
+                types.InlineKeyboardButton("💰 Деньги", callback_data='money'),
+                types.InlineKeyboardButton("🔮 Завтра", callback_data='state')
+            )
+            bot.send_message(user_id, "☀️ Доброе утро! Карты уже ждут тебя — выбери расклад на сегодня ✨", reply_markup=markup)
             subscribed_users[user_id]['notified'] = False
-            subscribed_users[user_id]['last_date'] = today
-        except:
-            continue
+            subscribed_users[user_id]['last_date'] = datetime.date.today()
+        except Exception as e:
+            print(f"[Reminder error] {e}")
 
-schedule.every().day.at("05:00").do(send_daily_reminder)
-
-def schedule_checker():
+# --- Фоновая проверка времени ---
+def daily_checker():
+    last_sent_date = None
     while True:
-        schedule.run_pending()
+        now = datetime.datetime.utcnow()
+        # 06:30 UTC == 09:30 МСК
+        if now.hour == 6 and now.minute == 30:
+            today = datetime.date.today()
+            if last_sent_date != today:
+                send_daily_reminder()
+                last_sent_date = today
         time.sleep(30)
 
-Thread(target=schedule_checker).start()
+Thread(target=daily_checker, daemon=True).start()
 
-# --- Flask для Replit / UptimeRobot ---
+# --- Авто‑сообщение после расклада ---
+def delayed_offer(user_id):
+    # Первое сообщение
+    text1 = (
+        "🔮 Карты показали дверь... но ключ спрятали.\n"
+        "А что если сказать — у меня есть этот ключ?\n\n"
+        "🔮 Здесь тайная комната. Карты говорят откровеннее, "
+        "расклады глубже, а секреты честнее ✨\n\n"
+        "👇 Заходи — называется открыть тайную комнату."
+    )
+    markup1 = types.InlineKeyboardMarkup()
+    markup1.add(types.InlineKeyboardButton("📖 Открыть тайную комнату", url="https://t.me/nasty_tarolog"))
+    bot.send_photo(user_id, photo_id, caption=text1, reply_markup=markup1)
+
+    time.sleep(4)
+
+    # Второе сообщение
+    text2 = (
+        "Знаете, что происходит, когда карты говорят лично с вами?\n"
+        "Они называют имена. Показывают лица. Это не магия. "
+        "Это ваша личная инструкция к жизни. ✨\n\n"
+        "https://t.me/NastyaKazantceva — пишите, если душа просит большего 🌙"
+    )
+    markup2 = types.InlineKeyboardMarkup()
+    markup2.add(types.InlineKeyboardButton("💌 Личный разбор", url="https://t.me/NastyaKazantceva"))
+    bot.send_message(user_id, text2, reply_markup=markup2)
+
+# --- Flask для пинга ---
 @app.route('/')
 def home():
     return "Бот работает!"
@@ -58,9 +85,7 @@ def run():
     app.run(host='0.0.0.0', port=8080)
 
 def keep_alive():
-    t = Thread(target=run)
-    t.start()
-
+    Thread(target=run).start()
 # --- Тестовые расклады на каждый день (замени на свои) ---
 love_readings = {
     1: "✨ Императрица\nЛюбовь расцветает, как весенний сад. Магнетизм притягивает нужных людей. Плодородие во всех смыслах.",
@@ -170,12 +195,11 @@ state_readings = {
     31: "🛡️ Шестерка Мечей\nПереход к спокойствию после бури. Оставь позади то, что тянет вниз. Облегчение приходит в пути."
 }
 
-# --- Команда /start и кнопки ---
+# --- Команда /start ---
 @bot.message_handler(commands=['start'])
 def welcome(message):
     user_id = message.chat.id
     today = datetime.date.today()
-
     if user_id not in subscribed_users:
         subscribed_users[user_id] = {'last_date': today, 'notified': False}
 
@@ -194,7 +218,6 @@ def handle_query(call):
     today = get_today_day()
     today_date = datetime.date.today()
 
-    # Сброс уведомления, если наступил новый день
     if user_id in subscribed_users and subscribed_users[user_id]['last_date'] != today_date:
         subscribed_users[user_id]['notified'] = False
         subscribed_users[user_id]['last_date'] = today_date
@@ -211,22 +234,16 @@ def handle_query(call):
 
     bot.send_message(user_id, text)
 
-    # Отправить авто-сообщение только 1 раз в день
     if user_id in subscribed_users and not subscribed_users[user_id]['notified']:
         Thread(target=lambda: delayed_offer(user_id)).start()
         subscribed_users[user_id]['notified'] = True
 
-def delayed_offer(user_id):
-    time.sleep(10)
-    bot.send_photo(user_id, photo_id, caption=auto_message)
-
-# --- Запуск --
+# --- Запуск ---
 keep_alive()
 
 while True:
     try:
-        bot.polling(none_stop=True)
+        bot.polling(none_stop=True, timeout=60)
     except Exception as e:
         print(f"[Polling error] {e}")
         time.sleep(15)
-
