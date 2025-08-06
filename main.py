@@ -159,6 +159,9 @@ Thread(target=daily_checker, daemon=True).start()
 
 # --- Авто-сообщение ---
 def delayed_offer(user_id):
+    # Задержка перед авто-сообщением, чтобы успели прочитать расклад
+    time.sleep(3)
+
     # Первое сообщение
     text1 = (
         "🔮 Карты показали дверь... но ключ спрятали.\n"
@@ -178,8 +181,8 @@ def delayed_offer(user_id):
     markup2.add(types.InlineKeyboardButton("💌 Личный разбор", url="https://t.me/NastyaKazantceva"))
     bot.send_message(user_id, text2, reply_markup=markup2)
 
-    # Показываем меню снова
-    bot.send_message(user_id, "Выбери тему расклада:", reply_markup=get_menu_markup())
+    # Меню снова
+    bot.send_message(user_id, "Что тебя сегодня волнует?", reply_markup=get_menu_markup())
 
 # --- Flask ---
 @app.route('/')
@@ -200,7 +203,7 @@ def welcome(message):
     if user_id not in subscribed_users:
         subscribed_users[user_id] = {'last_date': today, 'offer_sent': False}
 
-    bot.send_message(user_id, "Выбери тему расклада на сегодня:", reply_markup=get_menu_markup())
+    bot.send_message(user_id, "Что тебя сегодня волнует?", reply_markup=get_menu_markup())
 
 # --- Обработка кнопок ---
 @bot.callback_query_handler(func=lambda call: True)
@@ -228,12 +231,13 @@ def handle_query(call):
 
     bot.send_message(user_id, text)
 
-    # Сразу показываем меню
-    bot.send_message(user_id, "Выбери тему расклада:", reply_markup=get_menu_markup())
-
+    # Логика авто-сообщения
     if not subscribed_users[user_id]['offer_sent']:
         Thread(target=lambda: delayed_offer(user_id)).start()
         subscribed_users[user_id]['offer_sent'] = True
+    else:
+        # Если авто-сообщение уже было сегодня
+        bot.send_message(user_id, "Что тебя сегодня волнует?", reply_markup=get_menu_markup())
 
 # --- Запуск ---
 keep_alive()
