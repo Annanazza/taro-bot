@@ -22,8 +22,6 @@ def get_menu_markup():
     )
     return markup
 
-
-
 # --- Тестовые расклады на каждый день (замени на свои) ---
 love_readings = {
     1: "✨ Императрица\nЛюбовь расцветает, как весенний сад. Магнетизм притягивает нужных людей. Плодородие во всех смыслах.",
@@ -133,11 +131,9 @@ state_readings = {
     31: "🛡️ Шестерка Мечей\nПереход к спокойствию после бури. Оставь позади то, что тянет вниз. Облегчение приходит в пути."
 }
 
-# --- Авто-сообщение ---
 def delayed_offer(user_id):
-    time.sleep(3)  # Пауза после расклада
-
-    # Первое сообщение
+    time.sleep(3)
+    # Сообщение 1
     text1 = (
         "🔮 Карты показали дверь... но ключ спрятали.\n"
         "А что если сказать — у меня есть этот ключ?\n\n"
@@ -149,8 +145,7 @@ def delayed_offer(user_id):
     bot.send_photo(user_id, photo_id, caption=text1, reply_markup=markup1)
 
     time.sleep(4)
-
-    # Второе сообщение
+    # Сообщение 2
     text2 = "👇 Пишите, если душа просит большего 🌙"
     markup2 = types.InlineKeyboardMarkup()
     markup2.add(types.InlineKeyboardButton("💌 Личный разбор", url="https://t.me/NastyaKazantceva"))
@@ -172,39 +167,31 @@ def keep_alive():
 def welcome(message):
     user_id = message.chat.id
     today = datetime.date.today()
-    if user_id not in subscribed_users:
-        subscribed_users[user_id] = {'last_date': today, 'offer_sent': False, 'menu_message_id': None}
+    subscribed_users[user_id] = {'last_date': today, 'offer_sent': False, 'menu_message_id': None}
 
-    # Отправляем меню и сохраняем ID
     sent = bot.send_message(user_id, "Что тебя сегодня волнует?", reply_markup=get_menu_markup())
     subscribed_users[user_id]['menu_message_id'] = sent.message_id
 
+# --- Обработка кнопок ---
 @bot.callback_query_handler(func=lambda call: True)
 def handle_query(call):
     user_id = call.message.chat.id
-    today = get_today_day()
+    today_num = get_today_day()
     today_date = datetime.date.today()
 
-    # Если пользователь новый — добавляем в словарь
     if user_id not in subscribed_users:
-        subscribed_users[user_id] = {
-            'last_date': today_date,
-            'offer_sent': False,
-            'menu_message_id': call.message.message_id
-        }
+        subscribed_users[user_id] = {'last_date': today_date, 'offer_sent': False, 'menu_message_id': call.message.message_id}
 
-    # Если наступил новый день — сбрасываем статус
     if subscribed_users[user_id]['last_date'] != today_date:
         subscribed_users[user_id]['offer_sent'] = False
         subscribed_users[user_id]['last_date'] = today_date
 
-    # Определяем, какой расклад отправить
     if call.data == 'love':
-        text = love_readings.get(today, "Нет расклада на сегодня.")
+        text = love_readings.get(today_num, "Нет расклада на сегодня.")
     elif call.data == 'money':
-        text = money_readings.get(today, "Нет расклада на сегодня.")
+        text = money_readings.get(today_num, "Нет расклада на сегодня.")
     elif call.data == 'state':
-        text = state_readings.get(today, "Нет прогноза на сегодня.")
+        text = state_readings.get(today_num, "Нет прогноза на сегодня.")
     else:
         bot.answer_callback_query(call.id, "Непонятный выбор.")
         return
@@ -212,18 +199,20 @@ def handle_query(call):
     # Отправляем расклад
     bot.send_message(user_id, text)
 
-    # Если авто-сообщение ещё не отправлялось сегодня — отправляем
+    # Первое нажатие за день — авто-сообщение
     if not subscribed_users[user_id]['offer_sent']:
         Thread(target=lambda: delayed_offer(user_id)).start()
         subscribed_users[user_id]['offer_sent'] = True
 
-    # Обновляем клавиатуру меню (возврат наверх)
+    # Обновляем кнопки в одном сообщении
     bot.edit_message_reply_markup(
         chat_id=user_id,
         message_id=subscribed_users[user_id]['menu_message_id'],
         reply_markup=get_menu_markup()
     )
 
+def get_today_day():
+    return datetime.datetime.now().day
 
 # --- Запуск ---
 keep_alive()
