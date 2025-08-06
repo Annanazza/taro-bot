@@ -56,8 +56,7 @@ def delayed_offer(user_id):
         "🔮 Карты показали дверь... но ключ спрятали.\n"
         "А что если сказать — у меня есть этот ключ?\n\n"
         "🔮 Здесь тайная комната. Карты говорят откровеннее, "
-        "расклады глубже, а секреты честнее ✨\n\n"
-        "👇 Заходи"
+        "расклады глубже, а секреты честнее 👇"
     )
     markup1 = types.InlineKeyboardMarkup()
     markup1.add(types.InlineKeyboardButton("📖 Открыть тайную комнату", url="https://t.me/nasty_tarolog"))
@@ -71,9 +70,6 @@ def delayed_offer(user_id):
     markup2.add(types.InlineKeyboardButton("💌 Личный разбор", url="https://t.me/NastyaKazantceva"))
     bot.send_message(user_id, text2, reply_markup=markup2)
 
-    markup2 = types.InlineKeyboardMarkup()
-    markup2.add(types.InlineKeyboardButton("💌 Личный разбор", url="https://t.me/NastyaKazantceva"))
-    bot.send_message(user_id, text2, reply_markup=markup2)
 
 # --- Flask для пинга ---
 @app.route('/')
