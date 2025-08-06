@@ -208,15 +208,23 @@ def welcome(message):
 
 # --- Обработка кнопок ---
 @bot.callback_query_handler(func=lambda call: True)
+@bot.callback_query_handler(func=lambda call: True)
 def handle_query(call):
     user_id = call.message.chat.id
     today = get_today_day()
     today_date = datetime.date.today()
 
-    if user_id in subscribed_users and subscribed_users[user_id]['last_date'] != today_date:
+    # Добавляем пользователя в список, если его нет
+    if user_id not in subscribed_users:
+        subscribed_users[user_id] = {'last_date': today_date, 'notified': False, 'offer_sent': False}
+
+    # Сброс флагов при новом дне
+    if subscribed_users[user_id]['last_date'] != today_date:
         subscribed_users[user_id]['notified'] = False
+        subscribed_users[user_id]['offer_sent'] = False
         subscribed_users[user_id]['last_date'] = today_date
 
+    # Определяем текст расклада
     if call.data == 'love':
         text = love_readings.get(today, "Нет расклада на сегодня.")
     elif call.data == 'money':
@@ -227,11 +235,13 @@ def handle_query(call):
         bot.send_message(user_id, "Непонятный выбор.")
         return
 
+    # Отправляем расклад
     bot.send_message(user_id, text)
 
-    if user_id in subscribed_users and not subscribed_users[user_id]['notified']:
+    # Автосообщение — только если ещё не отправляли сегодня
+    if not subscribed_users[user_id]['offer_sent']:
         Thread(target=lambda: delayed_offer(user_id)).start()
-        subscribed_users[user_id]['notified'] = True
+        subscribed_users[user_id]['offer_sent'] = True
 
 # --- Запуск ---
 keep_alive()
