@@ -12,18 +12,16 @@ app = Flask('')
 subscribed_users = {}
 photo_id = "AgACAgIAAxkBAAOCaH9iyqNRv_SfKkfo5Ptmxf82MdwAAm71MRuazPlLJrS1RkCpC_8BAAMCAAN3AAM2BA"
 
-def get_today_day():
-    return datetime.datetime.now().day
-
 # --- Клавиатура выбора ---
 def get_menu_markup():
     markup = types.InlineKeyboardMarkup()
     markup.add(
         types.InlineKeyboardButton("💖 Отношения", callback_data='love'),
         types.InlineKeyboardButton("💰 Деньги", callback_data='money'),
-        types.InlineKeyboardButton("🔮 Завтра", callback_data='state')
+        types.InlineKeyboardButton("🔮 Будущее", callback_data='state')
     )
     return markup
+
 
 
 # --- Тестовые расклады на каждый день (замени на свои) ---
@@ -135,32 +133,9 @@ state_readings = {
     31: "🛡️ Шестерка Мечей\nПереход к спокойствию после бури. Оставь позади то, что тянет вниз. Облегчение приходит в пути."
 }
 
-def send_daily_reminder():
-    for user_id in list(subscribed_users.keys()):
-        try:
-            bot.send_message(user_id, "☀️ Доброе утро! Карты уже ждут тебя — выбери расклад на сегодня ✨", reply_markup=get_menu_markup())
-            subscribed_users[user_id]['offer_sent'] = False
-            subscribed_users[user_id]['last_date'] = datetime.date.today()
-        except Exception as e:
-            print(f"[Reminder error] {e}")
-
-def daily_checker():
-    last_sent_date = None
-    while True:
-        now = datetime.datetime.utcnow()
-        if now.hour == 6 and now.minute == 30:  # 09:30 МСК
-            today = datetime.date.today()
-            if last_sent_date != today:
-                send_daily_reminder()
-                last_sent_date = today
-        time.sleep(30)
-
-Thread(target=daily_checker, daemon=True).start()
-
 # --- Авто-сообщение ---
 def delayed_offer(user_id):
-    # Задержка перед авто-сообщением, чтобы успели прочитать расклад
-    time.sleep(3)
+    time.sleep(3)  # Пауза после расклада
 
     # Первое сообщение
     text1 = (
@@ -181,9 +156,6 @@ def delayed_offer(user_id):
     markup2.add(types.InlineKeyboardButton("💌 Личный разбор", url="https://t.me/NastyaKazantceva"))
     bot.send_message(user_id, text2, reply_markup=markup2)
 
-    # Меню снова
-    bot.send_message(user_id, "Что тебя сегодня волнует?", reply_markup=get_menu_markup())
-
 # --- Flask ---
 @app.route('/')
 def home():
@@ -201,9 +173,11 @@ def welcome(message):
     user_id = message.chat.id
     today = datetime.date.today()
     if user_id not in subscribed_users:
-        subscribed_users[user_id] = {'last_date': today, 'offer_sent': False}
+        subscribed_users[user_id] = {'last_date': today, 'offer_sent': False, 'menu_message_id': None}
 
-    bot.send_message(user_id, "Что тебя сегодня волнует?", reply_markup=get_menu_markup())
+    # Отправляем меню и сохраняем ID
+    sent = bot.send_message(user_id, "Что тебя сегодня волнует?", reply_markup=get_menu_markup())
+    subscribed_users[user_id]['menu_message_id'] = sent.message_id
 
 # --- Обработка кнопок ---
 @bot.callback_query_handler(func=lambda call: True)
@@ -213,7 +187,7 @@ def handle_query(call):
     today_date = datetime.date.today()
 
     if user_id not in subscribed_users:
-        subscribed_users[user_id] = {'last_date': today_date, 'offer_sent': False}
+        subscribed_users[user_id] = {'last_date': today_date, 'offer_sent': False, 'menu_message_id': call.message.message_id}
 
     if subscribed_users[user_id]['last_date'] != today_date:
         subscribed_users[user_id]['offer_sent'] = False
@@ -226,18 +200,26 @@ def handle_query(call):
     elif call.data == 'state':
         text = state_readings.get(today, "Нет прогноза на сегодня.")
     else:
-        bot.send_message(user_id, "Непонятный выбор.")
+        bot.answer_callback_query(call.id, "Непонятный выбор.")
         return
 
+    # Отправляем расклад отдельным сообщением
     bot.send_message(user_id, text)
 
-    # Логика авто-сообщения
+    # Если авто-сообщение еще не было сегодня
     if not subscribed_users[user_id]['offer_sent']:
         Thread(target=lambda: delayed_offer(user_id)).start()
         subscribed_users[user_id]['offer_sent'] = True
-    else:
-        # Если авто-сообщение уже было сегодня
-        bot.send_message(user_id, "Что тебя сегодня волнует?", reply_markup=get_menu_markup())
+
+    # Редактируем меню, чтобы "вернуться наверх"
+    bot.edit_message_reply_markup(
+        chat_id=user_id,
+        message_id=subscribed_users[user_id]['menu_message_id'],
+        reply_markup=get_menu_markup()
+    )
+
+def get_today_day():
+    return datetime.datetime.now().day
 
 # --- Запуск ---
 keep_alive()
